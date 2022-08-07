@@ -66,11 +66,15 @@ func main() {
 
 	// Upload an object with storage.Writer.
 	wc := o.NewWriter(ctx)
-	if _, err = io.Copy(wc, f); err != nil {
+	if _, err := io.Copy(wc, f); err != nil {
 		panic(fmt.Errorf("io.Copy: %v", err))
 	}
 	if err := wc.Close(); err != nil {
 		panic(fmt.Errorf("Writer.Close: %v", err))
 	}
 	fmt.Printf("Blob %v uploaded.\n", object)
+
+	if err := os.Remove(path); err != nil {
+		panic(fmt.Errorf("Cannot remove dump file %s: %v", path, err))
+	}
 }
