@@ -2,9 +2,23 @@ package pkg
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+func createPgPass(conn Connection, path string) error {
+	if err := os.WriteFile(
+		path,
+		// hostname:port:database:username:password
+		[]byte(fmt.Sprintf("%s:%s:%s:%s:%s", conn.Host, conn.Port, conn.DB, conn.Username, conn.Password)),
+		0o600,
+	); err != nil {
+		return fmt.Errorf("Create %s fails: %s", path, err.Error())
+	}
+	return nil
+}
 
 // https://unix.stackexchange.com/questions/247576/how-to-get-home-given-user
 func getHomeDirectory() (home string, err error) {
