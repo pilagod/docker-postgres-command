@@ -14,21 +14,14 @@ type DumpOption struct {
 }
 
 func Dump(opt DumpOption) (path string, err error) {
-	home, err := getHomeDirectory()
-	if err != nil {
-		err = fmt.Errorf("Cannot get home directory: %s", err.Error())
-		return
-	}
-
-	// Dump db to home directory
+	// Dump db to root directory
 	path = fmt.Sprintf(
-		"%s/pgdb_%s.dump",
-		home,
+		"/pgdb_%s.dump",
 		time.Now().Format("20060102150405"),
 	)
 
-	// Create .pgpass file at home directory
-	pgPassPath := home + "/.pgpass"
+	// Create .pgpass file at root directory
+	pgPassPath := "/.pgpass"
 	if err = os.WriteFile(
 		pgPassPath,
 		// hostname:port:database:username:password
@@ -41,19 +34,20 @@ func Dump(opt DumpOption) (path string, err error) {
 	defer func() {
 		if err = os.Remove(pgPassPath); err != nil {
 			err = fmt.Errorf("Remove %s fails: %s", pgPassPath, err.Error())
-			return
 		}
 	}()
 
 	// First element after splitting is empty string, just omit it.
 	pgDumpArgs := strings.Split(
-		fmt.Sprintf("%s -f%s -d%s -h%s -p%s -U%s -w", opt.Flags, path, opt.DB, opt.Host, opt.Port, opt.Username),
+		fmt.Sprintf("%s -f%s -h%s -p%s -d%s -U%s -w", opt.Flags, path, opt.Host, opt.Port, opt.DB, opt.Username),
 		"-",
 	)[1:]
 	for i, arg := range pgDumpArgs {
 		pgDumpArgs[i] = "-" + strings.TrimSpace(arg)
 	}
-	if err = exec.Command("pg_dump", pgDumpArgs...).Run(); err != nil {
+	pgDump := exec.Command("pg_dump", pgDumpArgs...)
+	pgDump.Env = append(pgDump.Env, "PGPASSFILE=/.pgpass")
+	if err = pgDump.Run(); err != nil {
 		err = fmt.Errorf("Execute pg_dump fails: %s", err.Error())
 	}
 	return
