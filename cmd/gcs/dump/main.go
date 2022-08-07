@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	path, err := pkg.Dump(
+	pgDumpPath, err := pkg.Dump(
 		pkg.DumpOption{
 			Connection: pkg.Connection{
 				Host:     os.Getenv("HOST"),
@@ -29,8 +29,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer os.Remove(pgDumpPath)
+
 	bucket := os.Getenv("BUCKET")
-	object := path[strings.LastIndex(path, "/")+1:]
+	object := pgDumpPath[strings.LastIndex(pgDumpPath, "/")+1:]
 
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
@@ -39,12 +41,11 @@ func main() {
 	}
 	defer client.Close()
 
-	// Open local file.
-	f, err := os.Open(path)
+	pgDumpFile, err := os.Open(pgDumpPath)
 	if err != nil {
 		panic(fmt.Errorf("os.Open: %v", err))
 	}
-	defer f.Close()
+	defer pgDumpFile.Close()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
@@ -66,15 +67,11 @@ func main() {
 
 	// Upload an object with storage.Writer.
 	wc := o.NewWriter(ctx)
-	if _, err := io.Copy(wc, f); err != nil {
+	if _, err := io.Copy(wc, pgDumpFile); err != nil {
 		panic(fmt.Errorf("io.Copy: %v", err))
 	}
 	if err := wc.Close(); err != nil {
 		panic(fmt.Errorf("Writer.Close: %v", err))
 	}
 	fmt.Printf("Blob %v uploaded.\n", object)
-
-	if err := os.Remove(path); err != nil {
-		panic(fmt.Errorf("Cannot remove dump file %s: %v", path, err))
-	}
 }
